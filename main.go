@@ -26,7 +26,7 @@ import (
 
 var (
 	GuildID        = flag.String("guild", "", "Test guild ID. If not passed - bot registers commands globally")
-	BotToken       = flag.String("token", "OTg3MzkxNDk2NzI0NTcwMTM0.G6pgnf.n1SBshrH7P1LClF2QwkAF2pOh5bBqhto1fyz0Q", "Bot access token")
+	BotToken       = flag.String("token", "", "Bot access token")
 	RemoveCommands = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
 	InfoMessages   = []string{
 		`Hello, I'm a bot made by <@!556848982433857537>!`,
@@ -52,7 +52,7 @@ func init() { flag.Parse() }
 func init() {
 	var err error
 	err = godotenv.Load()
-	if BotToken == nil {
+	if BotToken == nil || *BotToken == "" {
 		*BotToken = os.Getenv("TOKEN")
 	}
 	if err != nil {

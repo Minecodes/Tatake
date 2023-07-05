@@ -2,7 +2,7 @@
 
 # Tatake
 
-An multipurpose Discord bot, created in Go and created for tech communities.
+A multipurpose Discord bot, created in Go and created for tech communities.
 
 Invite: [discord.com/api/oauth2/authorize?client_id=987391496724570134&permissions=431711709376&scope=bot%20applications.commands](https://discord.com/api/oauth2/authorize?client_id=987391496724570134&permissions=431711709376&scope=bot%20applications.commands)
 

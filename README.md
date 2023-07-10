@@ -17,6 +17,7 @@ Invite: [discord.com/api/oauth2/authorize?client_id=987391496724570134&permissio
 |     httpcat     | Get a HTTP status code as a cat picture |
 |       fox       | Get a random fox picture                |
 |     qrcode      | Generate a QR code                      |
+|    password     | Generate a random password              |
 |     trains      | Trainboy: me gusta los trenes           |
 
 

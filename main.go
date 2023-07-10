@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	//"fmt"
@@ -25,10 +26,13 @@ import (
 )
 
 var (
-	GuildID        = flag.String("guild", "", "Test guild ID. If not passed - bot registers commands globally")
-	BotToken       = flag.String("token", "", "Bot access token")
-	RemoveCommands = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
-	InfoMessages   = []string{
+	GuildID           = flag.String("guild", "", "Test guild ID. If not passed - bot registers commands globally")
+	BotToken          = flag.String("token", "", "Bot access token")
+	RemoveCommands    = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
+	minPasswordLength = float64(12)
+	maxPasswordLength = float64(100)
+	passwordChars     = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_+{}[]:;?/.,<>")
+	InfoMessages      = []string{
 		`Hello, I'm a bot made by <@!556848982433857537>!`,
 		`Hello SlimeDiamond`,
 		`"Never trust a tech guy with a rat tail—too easy to carve secrets out of him." - Lone Star (Mr. Robot)`,
@@ -62,6 +66,19 @@ func init() {
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
+}
+
+func gen(length int64) string {
+	password := make([]rune, length)
+	for i := range password {
+		password[i] = passwordChars[rand.Intn(len(passwordChars))]
+	}
+	// check if password has at least one number, one uppercase letter, one lowercase letter and one special character
+	// if not, generate a new password
+	if !strings.ContainsAny(string(password), "0123456789") || !strings.ContainsAny(string(password), "abcdefghijklmnopqrstuvwxyz") || !strings.ContainsAny(string(password), "ABCDEFGHIJKLMNOPQRSTUVWXYZ") || !strings.ContainsAny(string(password), "!@#$%^&*()_+{}[]:;?/.,<>") {
+		return gen(length)
+	}
+	return string(password)
 }
 
 var (
@@ -156,6 +173,20 @@ var (
 					Name:        "text",
 					Description: "Text to encode",
 					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "password",
+			Description: "Generate a random password",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "length",
+					Description: "Length of the password",
+					Required:    true,
+					MinValue:    &minPasswordLength,
+					MaxValue:    maxPasswordLength,
 				},
 			},
 		},
@@ -516,6 +547,24 @@ var (
 								Width:  1000,
 								Height: 1000,
 							},
+						},
+					},
+				},
+			})
+		},
+		"password": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			length := i.Interaction.ApplicationCommandData().Options[0].IntValue()
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "",
+					Flags:   discordgo.MessageFlagsEphemeral,
+					Embeds: []*discordgo.MessageEmbed{
+						{
+							Title:       "Password",
+							Color:       0x00ff00,
+							Description: "Your password is: `" + gen(length) + "`",
 						},
 					},
 				},

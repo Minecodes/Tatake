@@ -1,4 +1,4 @@
-![](https://web-static.vercel.app/tatake-banner.png)
+![](https://git.minecodes.de/Team/assets/raw/branch/main/Tatake%20Banner.png)
 
 # Tatake
 

@@ -3,26 +3,24 @@ package main
 import (
 	//"errors"
 
-	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
-	"strconv"
-	"strings"
-	"time"
 
 	//"fmt"
-	"io/ioutil"
+
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 
 	//"strings"
 	//"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"gosrc.io/xmpp"
+	"gosrc.io/xmpp/stanza"
 )
 
 var (
@@ -31,7 +29,6 @@ var (
 	RemoveCommands    = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
 	minPasswordLength = float64(12)
 	maxPasswordLength = float64(100)
-	passwordChars     = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_+{}[]:;?/.,<>")
 	InfoMessages      = []string{
 		`Hello, I'm a bot made by <@!556848982433857537>!`,
 		`Hello SlimeDiamond`,
@@ -66,19 +63,6 @@ func init() {
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
-}
-
-func gen(length int64) string {
-	password := make([]rune, length)
-	for i := range password {
-		password[i] = passwordChars[rand.Intn(len(passwordChars))]
-	}
-	// check if password has at least one number, one uppercase letter, one lowercase letter and one special character
-	// if not, generate a new password
-	if !strings.ContainsAny(string(password), "0123456789") || !strings.ContainsAny(string(password), "abcdefghijklmnopqrstuvwxyz") || !strings.ContainsAny(string(password), "ABCDEFGHIJKLMNOPQRSTUVWXYZ") || !strings.ContainsAny(string(password), "!@#$%^&*()_+{}[]:;?/.,<>") {
-		return gen(length)
-	}
-	return string(password)
 }
 
 var (
@@ -193,383 +177,15 @@ var (
 	}
 
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-		"trains": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "🚅 I like trains! 🚅",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-		},
-		"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "Pong!",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-		},
-		"weather": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			loc := i.Interaction.ApplicationCommandData().Options[0].StringValue()
-			// make http request
-			req, err := http.NewRequest("GET", "https://wttr.in/"+loc+"?0&T", nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-			req.Header.Set("User-Agent", "curl")
-			req.Response, err = http.DefaultClient.Do(req)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer req.Response.Body.Close()
-			body, err := ioutil.ReadAll(req.Response.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if i.Interaction.ApplicationCommandData().Options[1].BoolValue() {
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "",
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Weather in " + loc,
-								Description: "```" + string(body) + "```",
-								Color:       0x0E86D4,
-								Timestamp:   time.Now().Format(time.RFC3339),
-								Provider: &discordgo.MessageEmbedProvider{
-									Name: "wttr.in",
-									URL:  "https://wttr.in",
-								},
-								Author: &discordgo.MessageEmbedAuthor{
-									Name: "wttr.in",
-									URL:  "https://wttr.in",
-								},
-							},
-						},
-						Flags: discordgo.MessageFlagsEphemeral,
-					},
-				})
-			} else {
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "",
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Weather in " + loc,
-								Description: "```" + string(body) + "```",
-								Color:       0x0E86D4,
-								Timestamp:   time.Now().Format(time.RFC3339),
-								Provider: &discordgo.MessageEmbedProvider{
-									Name: "wttr.in",
-									URL:  "https://wttr.in",
-								},
-								Author: &discordgo.MessageEmbedAuthor{
-									Name: "wttr.in",
-									URL:  "https://wttr.in",
-								},
-							},
-						},
-					},
-				})
-			}
-		},
-		"gh": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			if i.Interaction.ApplicationCommandData().Options[0].Name == "user" {
-				user := i.Interaction.ApplicationCommandData().Options[0].Options[0].StringValue()
-				req, err := http.NewRequest("GET", "https://api.github.com/users/"+user, nil)
-				if err != nil {
-					log.Fatal(err)
-				}
-				req.Header.Set("User-Agent", "curl")
-				req.Response, err = http.DefaultClient.Do(req)
-				if err != nil {
-					log.Fatal(err)
-				}
-				defer req.Response.Body.Close()
-				body, err := ioutil.ReadAll(req.Response.Body)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				type User struct {
-					Login             string `json:"login"`
-					ID                int    `json:"id"`
-					NodeID            string `json:"node_id"`
-					AvatarURL         string `json:"avatar_url"`
-					GravatarID        string `json:"gravatar_id"`
-					URL               string `json:"url"`
-					HTMLURL           string `json:"html_url"`
-					FollowersURL      string `json:"followers_url"`
-					FollowingURL      string `json:"following_url"`
-					GistsURL          string `json:"gists_url"`
-					StarredURL        string `json:"starred_url"`
-					SubscriptionsURL  string `json:"subscriptions_url"`
-					OrganizationsURL  string `json:"organizations_url"`
-					ReposURL          string `json:"repos_url"`
-					EventsURL         string `json:"events_url"`
-					ReceivedEventsURL string `json:"received_events_url"`
-					Type              string `json:"type"`
-					SiteAdmin         bool   `json:"site_admin"`
-					Name              string `json:"name"`
-					Company           string `json:"company"`
-					Blog              string `json:"blog"`
-					Location          string `json:"location"`
-					Email             string `json:"email"`
-					Hireable          bool   `json:"hireable"`
-					Bio               string `json:"bio"`
-					TwitterUsername   string `json:"twitter_username"`
-					PublicRepos       int    `json:"public_repos"`
-					PublicGists       int    `json:"public_gists"`
-					Followers         int    `json:"followers"`
-					Following         int    `json:"following"`
-					CreatedAt         string `json:"created_at"`
-					UpdatedAt         string `json:"updated_at"`
-				}
-
-				var data User
-				err = json.Unmarshal(body, &data)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				var fields = []*discordgo.MessageEmbedField{
-					{
-						Name:   "Username",
-						Value:  data.Login,
-						Inline: true,
-					},
-					{
-						Name:   "ID",
-						Value:  strconv.Itoa(data.ID),
-						Inline: true,
-					},
-					{
-						Name:   "Public Repos",
-						Value:  strconv.Itoa(data.PublicRepos),
-						Inline: true,
-					},
-					{
-						Name:   "Public Gists",
-						Value:  strconv.Itoa(data.PublicGists),
-						Inline: true,
-					},
-					{
-						Name:   "Followers",
-						Value:  strconv.Itoa(data.Followers),
-						Inline: true,
-					},
-					{
-						Name:   "Following",
-						Value:  strconv.Itoa(data.Following),
-						Inline: true,
-					},
-					{
-						Name:   "Created At",
-						Value:  data.CreatedAt,
-						Inline: true,
-					},
-				}
-
-				if data.Bio != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Bio",
-						Value:  data.Bio,
-						Inline: true,
-					})
-				}
-				if data.Company != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Company",
-						Value:  data.Company,
-						Inline: true,
-					})
-				}
-				if data.Location != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Location",
-						Value:  data.Location,
-						Inline: true,
-					})
-				}
-				if data.Email != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Email",
-						Value:  data.Email,
-						Inline: true,
-					})
-				}
-				if data.Blog != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Blog",
-						Value:  data.Blog,
-						Inline: true,
-					})
-				}
-				if data.TwitterUsername != "" {
-					fields = append(fields, &discordgo.MessageEmbedField{
-						Name:   "Twitter",
-						Value:  "https://twitter.com/" + data.TwitterUsername,
-						Inline: true,
-					})
-				}
-
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{
-						Content: "",
-						Embeds: []*discordgo.MessageEmbed{
-							{
-								Title:       "Github: " + user,
-								Color:       0x24292D,
-								Description: "",
-								Provider: &discordgo.MessageEmbedProvider{
-									Name: "Github",
-									URL:  "https://github.com",
-								},
-								Author: &discordgo.MessageEmbedAuthor{
-									Name:    data.Name,
-									URL:     data.HTMLURL,
-									IconURL: data.AvatarURL,
-								},
-								Timestamp: time.Now().Format(time.RFC3339),
-								Footer: &discordgo.MessageEmbedFooter{
-									Text:    "Provided by Github",
-									IconURL: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-								},
-								Fields: fields,
-							},
-						},
-						Flags: discordgo.MessageFlagsEphemeral,
-					},
-				})
-			}
-		},
-		"httpdog": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "",
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Title: "HTTP Dog",
-							Color: 0xfa7c91,
-							Image: &discordgo.MessageEmbedImage{
-								URL:    "https://http.dog/" + fmt.Sprint(i.Interaction.ApplicationCommandData().Options[0].FloatValue()) + ".jpg",
-								Width:  1400,
-								Height: 1600,
-							},
-							Provider: &discordgo.MessageEmbedProvider{
-								Name: "HTTP Dog",
-								URL:  "https://http.dog",
-							},
-							Author: &discordgo.MessageEmbedAuthor{
-								Name:    "HTTP Dog",
-								URL:     "https://http.dog",
-								IconURL: "https://http.dog/favicon.ico",
-							},
-							Timestamp: time.Now().Format(time.RFC3339),
-						},
-					},
-				},
-			})
-		},
-		"httpcat": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "",
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Title: "HTTP Cat",
-							Color: 0xfa7c91,
-							Image: &discordgo.MessageEmbedImage{
-								URL:    "https://http.cat/" + fmt.Sprint(i.Interaction.ApplicationCommandData().Options[0].FloatValue()) + ".jpg",
-								Width:  1400,
-								Height: 1600,
-							},
-							Provider: &discordgo.MessageEmbedProvider{
-								Name: "HTTP Cat",
-								URL:  "https://http.cat",
-							},
-							Author: &discordgo.MessageEmbedAuthor{
-								Name:    "HTTP Cat",
-								URL:     "https://http.cat",
-								IconURL: "https://http.cat/favicon.ico",
-							},
-							Timestamp: time.Now().Format(time.RFC3339),
-						},
-					},
-				},
-			})
-		},
-		"fox": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "",
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Author: &discordgo.MessageEmbedAuthor{
-								Name:    "Random Fox",
-								URL:     "https://randomfox.ca",
-								IconURL: "https://randomfox.ca/favicon.ico",
-							},
-							Color: 0xf48b00,
-							Image: &discordgo.MessageEmbedImage{
-								URL: "https://randomfox.ca/images/" + fmt.Sprint(rand.Intn(123)) + ".jpg",
-							},
-							Timestamp: time.Now().Format(time.RFC3339),
-						},
-					},
-				},
-			})
-		},
-		"qrcode": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			value := i.Interaction.ApplicationCommandData().Options[0].StringValue()
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "",
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Title: "QR Code",
-							Color: 0xffff66,
-							Image: &discordgo.MessageEmbedImage{
-								URL:    "https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=" + value,
-								Width:  1000,
-								Height: 1000,
-							},
-						},
-					},
-				},
-			})
-		},
-		"password": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-			length := i.Interaction.ApplicationCommandData().Options[0].IntValue()
-
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "",
-					Flags:   discordgo.MessageFlagsEphemeral,
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Title:       "Password",
-							Color:       0x00ff00,
-							Description: "Your password is: `" + gen(length) + "`",
-						},
-					},
-				},
-			})
-		},
+		"trains":   cmds.dcTrains,
+		"ping":     cmds.dcPing,
+		"weather":  cmds.dcWeather,
+		"gh":       cmds.dcGhUser,
+		"httpdog":  cmds.dcHTTPDog,
+		"httpcat":  cmds.dcHTTPCat,
+		"fox":      cmds.dcFox,
+		"qrcode":   cmds.dcQRCode,
+		"password": cmds.dcPassword,
 	}
 )
 
@@ -582,7 +198,24 @@ func init() {
 	})
 }
 
-func main() {
+func handleMessage(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: msg.Body}
+	_ = s.Send(reply)
+}
+
+func errorHandler(err error) {
+	fmt.Println(err.Error())
+}
+
+func dc(wg *sync.WaitGroup) {
+	defer wg.Done()
 	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
 	})
@@ -624,4 +257,72 @@ func main() {
 	}
 
 	log.Println("Gracefully shutting down.")
+	os.Exit(0)
+}
+
+func xmppBot(wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	config := xmpp.Config{
+		TransportConfiguration: xmpp.TransportConfiguration{
+			Address: "etc.minecodes.de:5222",
+		},
+		Jid:          "tatake@etc.minecodes.de",
+		Credential:   xmpp.Password("T*AM5%843#H&w!6krd&!"),
+		StreamLogger: os.Stdout,
+		Insecure:     false,
+		// TLSConfig: tls.Config{InsecureSkipVerify: true},
+	}
+
+	router := xmpp.NewRouter()
+	router.HandleFunc("message", handleMessage)
+
+	client, err := xmpp.NewClient(&config, router, errorHandler)
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
+
+	// If you pass the client to a connection manager, it will handle the reconnect policy
+	// for you automatically.
+	cm := xmpp.NewStreamManager(client, nil)
+	log.Fatal(cm.Run())
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	log.Println("Press Ctrl+C to exit")
+	<-stop
+	cm.Stop()
+}
+
+func main() {
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+	go dc(&wg)
+	go xmppBot(&wg)
+
+	wg.Wait()
+
+	/**config := xmpp.Config{
+		TransportConfiguration: xmpp.TransportConfiguration{
+			Address: "etc.minecodes.de:5222",
+		},
+		Jid:          "tatake@etc.minecodes.de",
+		Credential:   xmpp.Password("T*AM5%843#H&w!6krd&!"),
+		StreamLogger: os.Stdout,
+		Insecure:     false,
+		// TLSConfig: tls.Config{InsecureSkipVerify: true},
+	}
+
+	router := xmpp.NewRouter()
+	router.HandleFunc("message", handleMessage)
+
+	client, err := xmpp.NewClient(&config, router, errorHandler)
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
+
+	// If you pass the client to a connection manager, it will handle the reconnect policy
+	// for you automatically.
+	cm := xmpp.NewStreamManager(client, nil)
+	log.Fatal(cm.Run())**/
 }

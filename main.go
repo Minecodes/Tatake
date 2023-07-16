@@ -263,10 +263,10 @@ func xmppBot(wg *sync.WaitGroup) {
 
 	config := xmpp.Config{
 		TransportConfiguration: xmpp.TransportConfiguration{
-			Address: "etc.minecodes.de:5222",
+			Address: os.Getenv("HOST"),
 		},
-		Jid:          "",
-		Credential:   xmpp.Password(""),
+		Jid:          os.Getenv("USER"),
+		Credential:   xmpp.Password(os.Getenv("PASS")),
 		StreamLogger: os.Stdout,
 		Insecure:     false,
 		// TLSConfig: tls.Config{InsecureSkipVerify: true},

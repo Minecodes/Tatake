@@ -24,12 +24,10 @@ import (
 )
 
 var (
-	GuildID           = flag.String("guild", "", "Test guild ID. If not passed - bot registers commands globally")
-	BotToken          = flag.String("token", "", "Bot access token")
-	RemoveCommands    = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
-	minPasswordLength = float64(12)
-	maxPasswordLength = float64(100)
-	InfoMessages      = []string{
+	GuildID        = flag.String("guild", "", "Test guild ID. If not passed - bot registers commands globally")
+	BotToken       = flag.String("token", "", "Bot access token")
+	RemoveCommands = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
+	InfoMessages   = []string{
 		`Hello, I'm a bot made by <@!556848982433857537>!`,
 		`Hello SlimeDiamond`,
 		`"Never trust a tech guy with a rat tail—too easy to carve secrets out of him." - Lone Star (Mr. Robot)`,
@@ -177,15 +175,15 @@ var (
 	}
 
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-		"trains":   cmds.dcTrains,
-		"ping":     cmds.dcPing,
-		"weather":  cmds.dcWeather,
-		"gh":       cmds.dcGhUser,
-		"httpdog":  cmds.dcHTTPDog,
-		"httpcat":  cmds.dcHTTPCat,
-		"fox":      cmds.dcFox,
-		"qrcode":   cmds.dcQRCode,
-		"password": cmds.dcPassword,
+		"trains":   dcTrains,
+		"ping":     dcPing,
+		"weather":  dcWeather,
+		"gh":       dcGhUser,
+		"httpdog":  dcHTTPDog,
+		"httpcat":  dcHTTPCat,
+		"fox":      dcFox,
+		"qrcode":   dcQRCode,
+		"password": dcPassword,
 	}
 )
 
@@ -267,8 +265,8 @@ func xmppBot(wg *sync.WaitGroup) {
 		TransportConfiguration: xmpp.TransportConfiguration{
 			Address: "etc.minecodes.de:5222",
 		},
-		Jid:          "tatake@etc.minecodes.de",
-		Credential:   xmpp.Password("T*AM5%843#H&w!6krd&!"),
+		Jid:          "",
+		Credential:   xmpp.Password(""),
 		StreamLogger: os.Stdout,
 		Insecure:     false,
 		// TLSConfig: tls.Config{InsecureSkipVerify: true},

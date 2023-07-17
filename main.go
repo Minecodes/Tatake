@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ var (
 		`I was coded in NodeJS, but now I'm coded in Go`,
 		`If you need a job: created Linux VM, then "sudo rm -rf /*" and bye bye VM`,
 		`Encryption should be a human right`,
+		`I speak XMPP/Jabber too!`,
+		`Is it weird that a bot has a email address?`,
 	}
 )
 
@@ -185,6 +188,10 @@ var (
 				},
 			},
 		},
+		{
+			Name:        "motd",
+			Description: "Get the message of the day",
+		},
 	}
 
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
@@ -197,6 +204,7 @@ var (
 		"fox":      dcFox,
 		"qrcode":   dcQRCode,
 		"password": dcPassword,
+		"motd":     dcMOTD,
 	}
 )
 
@@ -237,10 +245,14 @@ func dcPassword(s *discordgo.Session, i *discordgo.InteractionCreate) {
 }
 
 func dcPing(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	msg := fmt.Sprintf("🏓 **Pong!** 🏓\n"+
+		"Latency: %dms\n"+
+		"Last check: %ds", s.HeartbeatLatency().Milliseconds(), s.LastHeartbeatSent.Second())
+
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: "Pong!",
+			Content: msg,
 			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	})
@@ -248,6 +260,8 @@ func dcPing(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 func dcQRCode(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	value := i.Interaction.ApplicationCommandData().Options[0].StringValue()
+	value = url.QueryEscape(value)
+
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -603,6 +617,22 @@ func dcFox(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	})
 }
 
+func dcMOTD(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "",
+			Flags:   discordgo.MessageFlagsEphemeral,
+			Embeds: []*discordgo.MessageEmbed{
+				{
+					Color:       0xf1ff24,
+					Description: InfoMessages[rand.Intn(len(InfoMessages))],
+				},
+			},
+		},
+	})
+}
+
 /**
   [XMPP] Commands
 **/
@@ -631,6 +661,194 @@ func xmppTrains(s xmpp.Sender, p stanza.Packet) {
 	_ = s.Send(reply)
 }
 
+func xmppPassword(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	args := strings.Split(msg.Body, " ")
+	if len(args) != 2 {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: "Usage: !password <length>"}
+		_ = s.Send(reply)
+		return
+	}
+
+	length, err := strconv.Atoi(args[1])
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: "Usage: !password <length>"}
+		_ = s.Send(reply)
+		return
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: gen(int64(length))}
+	_ = s.Send(reply)
+}
+
+func xmppWeather(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	args := strings.Split(msg.Body, " ")
+	if len(args) != 2 {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: "Usage: !weather <location>"}
+		_ = s.Send(reply)
+		return
+	}
+
+	// make http request
+	req, err := http.NewRequest("GET", "https://wttr.in/"+args[1]+"?0&T", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("User-Agent", "curl")
+	req.Response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer req.Response.Body.Close()
+	body, err := ioutil.ReadAll(req.Response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: string(body)}
+	_ = s.Send(reply)
+}
+
+func xmppGhUser(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	args := strings.Split(msg.Body, " ")
+	if len(args) != 2 {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: "Usage: !ghuser <username>"}
+		_ = s.Send(reply)
+		return
+	}
+
+	req, err := http.NewRequest("GET", "https://api.github.com/users/"+args[1], nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req.Header.Set("User-Agent", "curl")
+	req.Response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer req.Response.Body.Close()
+	body, err := ioutil.ReadAll(req.Response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type User struct {
+		Login             string `json:"login"`
+		ID                int    `json:"id"`
+		NodeID            string `json:"node_id"`
+		AvatarURL         string `json:"avatar_url"`
+		GravatarID        string `json:"gravatar_id"`
+		URL               string `json:"url"`
+		HTMLURL           string `json:"html_url"`
+		FollowersURL      string `json:"followers_url"`
+		FollowingURL      string `json:"following_url"`
+		GistsURL          string `json:"gists_url"`
+		StarredURL        string `json:"starred_url"`
+		SubscriptionsURL  string `json:"subscriptions_url"`
+		OrganizationsURL  string `json:"organizations_url"`
+		ReposURL          string `json:"repos_url"`
+		EventsURL         string `json:"events_url"`
+		ReceivedEventsURL string `json:"received_events_url"`
+		Type              string `json:"type"`
+		SiteAdmin         bool   `json:"site_admin"`
+		Name              string `json:"name"`
+		Company           string `json:"company"`
+		Blog              string `json:"blog"`
+		Location          string `json:"location"`
+		Email             string `json:"email"`
+		Hireable          bool   `json:"hireable"`
+		Bio               string `json:"bio"`
+		TwitterUsername   string `json:"twitter_username"`
+		PublicRepos       int    `json:"public_repos"`
+		PublicGists       int    `json:"public_gists"`
+		Followers         int    `json:"followers"`
+		Following         int    `json:"following"`
+		CreatedAt         string `json:"created_at"`
+		UpdatedAt         string `json:"updated_at"`
+	}
+
+	var data User
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	msgBody := fmt.Sprintf(`
+Username: %s
+Name: %s
+Bio: %s
+Location: %s
+Email: %s
+Twitter: %s
+Blog: %s
+Followers: %d
+Following: %d
+Public Repos: %d
+Public Gists: %d
+Created at: %s
+`, data.Login, data.Name, data.Bio, data.Location, data.Email, data.TwitterUsername, data.Blog, data.Followers, data.Following, data.PublicRepos, data.PublicGists, data.CreatedAt)
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: msgBody}
+	_ = s.Send(reply)
+}
+
+func xmppHelp(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	msgBody := `
+!ping - Send a ping message
+!trains - 🚄 I Like Trains 🚄
+!ghuser <username> - Get Github profile infos
+!weather <city> - Get the weather forecast
+!motd - Get the message of the day
+!help - this message
+`
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: msgBody}
+	_ = s.Send(reply)
+}
+
+func xmppMOTD(s xmpp.Sender, p stanza.Packet) {
+	msg, ok := p.(stanza.Message)
+	if !ok {
+		_, _ = fmt.Fprintf(os.Stdout, "Ignoring packet: %T\n", p)
+		return
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
+	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: InfoMessages[rand.Intn(len(InfoMessages))]}
+	_ = s.Send(reply)
+}
+
 /**
   Handlers
 **/
@@ -656,15 +874,20 @@ func handleMessage(s xmpp.Sender, p stanza.Packet) {
 		switch cmd[0] {
 		case "ping":
 			xmppPing(s, msg)
-			break
 		case "trains":
 			xmppTrains(s, msg)
+		case "password":
+			xmppPassword(s, msg)
+		case "weather":
+			xmppWeather(s, msg)
+		case "ghuser":
+			xmppGhUser(s, msg)
+		case "help":
+			xmppHelp(s, msg)
+		case "motd":
+			xmppMOTD(s, msg)
 		}
 	}
-
-	/**_, _ = fmt.Fprintf(os.Stdout, "Body = %s - from = %s\n", msg.Body, msg.From)
-	reply := stanza.Message{Attrs: stanza.Attrs{To: msg.From}, Body: msg.Body}
-	_ = s.Send(reply)**/
 }
 
 func errorHandler(err error) {
@@ -734,7 +957,6 @@ func xmppBot(wg *sync.WaitGroup) {
 		Credential:   xmpp.Password(pass),
 		StreamLogger: nil, //os.Stdout,
 		Insecure:     false,
-		// TLSConfig: tls.Config{InsecureSkipVerify: true},
 	}
 
 	router := xmpp.NewRouter()
@@ -745,8 +967,6 @@ func xmppBot(wg *sync.WaitGroup) {
 		log.Fatalf("%+v", err)
 	}
 
-	// If you pass the client to a connection manager, it will handle the reconnect policy
-	// for you automatically.
 	cm := xmpp.NewStreamManager(client, nil)
 	fmt.Println(cm.Run())
 	stop := make(chan os.Signal, 1)
@@ -757,6 +977,15 @@ func xmppBot(wg *sync.WaitGroup) {
 }
 
 func main() {
+	rand.Seed(time.Now().Unix())
+	runners := []func(wg *sync.WaitGroup){}
+	if os.Getenv("ENABLE_DC") == "true" {
+		runners = append(runners, dc)
+	}
+	if os.Getenv("ENABLE_XMPP") == "true" {
+		runners = append(runners, xmppBot)
+	}
+
 	var wg sync.WaitGroup
 	var err error
 	err = godotenv.Load()
@@ -764,9 +993,10 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	wg.Add(2)
-	go dc(&wg)
-	go xmppBot(&wg)
+	wg.Add(len(runners))
+	for _, runner := range runners {
+		go runner(&wg)
+	}
 
 	wg.Wait()
 }

@@ -2,7 +2,7 @@
 
 # Tatake
 
-A multipurpose Discord bot, created in Go and created for tech communities.
+A multipurpose Discord/XMPP/Jabber bot, created in Go and created for tech communities.
 
 Invite: [discord.com/api/oauth2/authorize?client_id=987391496724570134&permissions=431711709376&scope=bot%20applications.commands](https://discord.com/api/oauth2/authorize?client_id=987391496724570134&permissions=431711709376&scope=bot%20applications.commands)
 
@@ -10,6 +10,7 @@ Invite: [discord.com/api/oauth2/authorize?client_id=987391496724570134&permissio
 
 |     Command     | Description |
 |     -------     | ----------- |
+|      help       | Show the help message (XMPP only)       |
 |      ping       | Pong!                                   |
 |     weather     | Get the weather of a city               |
 |     gh user     | Get information about a Github user     |
